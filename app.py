@@ -30,6 +30,9 @@ from flask import Flask, jsonify, request
 
 import audit
 import config
+import detector
+import scoring
+import stylometry
 
 app = Flask(__name__)
 
@@ -199,17 +202,67 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _reject("anonymous", "invalid_json",
+                       "Send a JSON object with a \"text\" field.", 400)
 
-    # TODO: delete this and build the route.
+    creator_id = payload.get("creator_id")
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        creator_id = "anonymous"
+
+    text = payload.get("text")
+    if not isinstance(text, str):
+        return _reject(creator_id, "missing_text",
+                       "Missing text: send your writing in a \"text\" field.", 400)
+    if not text.strip():
+        return _reject(creator_id, "empty_text",
+                       "Invalid spacing: the text is empty or only whitespace.", 400)
+    if len(text) > config.MAX_TEXT_CHARS:
+        return _reject(creator_id, "text_too_long",
+                       f"Text is too long: the limit is {config.MAX_TEXT_CHARS:,} characters.",
+                       413, length=len(text))
+    if len(stylometry.words(text)) < config.MIN_WORDS:
+        return _reject(creator_id, "text_too_short",
+                       f"Add more characters: at least {config.MIN_WORDS} words are needed.",
+                       400)
+
+    try:
+        model_score = detector.model_signal(text)
+    except ValueError:
+        # Five words can still be fewer tokens than the model needs.
+        return _reject(creator_id, "text_too_short",
+                       f"Add more characters: at least {config.MIN_WORDS} words are needed.",
+                       400)
+    except detector.DetectorUnavailable as exc:
+        audit.log_rejection(creator_id=creator_id, reason="detector_unavailable")
+        return jsonify({"error": "detector_unavailable", "message": str(exc)}), 503
+
+    style_score = stylometry.style_signal(text)
+    confidence = round(scoring.combine_signals(model_score, style_score), 4)
+    guess, label = scoring.score_to_label(confidence)
+
+    content_id = uuid.uuid4().hex
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        style_score=style_score,
+        combined_score=confidence,
+        label=label,
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "creator_id": creator_id,
+        "guess": guess,
+        "confidence": confidence,
+        "label": label,
+        "model_score": model_score,
+        "style_score": style_score,
+        "status": "decided",
+    })
 
 
 @app.post("/appeal")
@@ -232,14 +285,55 @@ def appeal():
     to the person on the other end. It's the only thing standing between a
     wrong accusation and nothing at all.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _reject("anonymous", "invalid_json",
+                       "Send a JSON object with \"content_id\" and \"reasoning\".",
+                       400, route="/appeal")
 
-    # TODO: delete this and build the route.
+    content_id = payload.get("content_id")
+    if not isinstance(content_id, str) or not content_id.strip():
+        return _reject("anonymous", "missing_content_id",
+                       "Missing content_id: include the id from your submission.",
+                       400, route="/appeal")
+    content_id = content_id.strip()
+
+    reasoning = payload.get("reasoning")
+    if not isinstance(reasoning, str) or not reasoning.strip():
+        return _reject("anonymous", "empty_reasoning",
+                       "Tell us why you think the result is wrong.",
+                       400, route="/appeal", appeal_for=content_id)
+
+    # Refusals are logged under `appeal_for`, not `content_id`, so a refused
+    # appeal never shows up as part of that item's history.
+    entries = audit.entries_for(content_id)
+    decisions = [e for e in entries if "event" not in e]
+    if not decisions:
+        return _reject("anonymous", "unknown_content_id",
+                       f"No submission found with content_id {content_id}.",
+                       404, route="/appeal", appeal_for=content_id)
+
+    creator_id = decisions[0].get("creator_id", "anonymous")
+    if any(e.get("event") == "appeal" for e in entries):
+        return jsonify({
+            "content_id": content_id,
+            "status": "under_review",
+            "message": "Already under review.",
+        }), 409
+
+    audit.log_appeal(content_id=content_id, creator_id=creator_id,
+                     reasoning=reasoning.strip())
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "content_id": content_id,
+        "status": "under_review",
+        "message": "valid",
+    })
+
+
+def _reject(creator_id, reason, message, status, **extra):
+    """Log a refused request, then tell the caller why it was refused."""
+    audit.log_rejection(creator_id=creator_id, reason=reason, **extra)
+    return jsonify({"error": reason, "message": message}), status
 
 
 # ── Already works ─────────────────────────────────────────────────────────────

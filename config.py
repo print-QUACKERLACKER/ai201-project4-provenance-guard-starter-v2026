@@ -47,6 +47,17 @@ DETECTOR_MODEL = os.getenv("AI201_DETECTOR_MODEL", "gpt2")
 DETECTOR_MAX_TOKENS = 400
 
 
+# ─── Input limits ────────────────────────────────────────────────────────────
+# What /submit refuses before either signal runs. Missing, empty and too-short
+# text get a 400; text over the cap gets a 413. Every refusal is logged.
+#
+# 10,000 characters is roughly 1,500–2,000 words — far more than any normal
+# submission, small enough that one request can't tie the model up.
+
+MIN_WORDS = 5
+MAX_TEXT_CHARS = 10_000
+
+
 # ─── Scoring (Milestone 4) ───────────────────────────────────────────────────
 # How much each signal counts toward the combined score.
 #
