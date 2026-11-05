@@ -96,9 +96,9 @@
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00 – 0.35 | Written by a human. Our checks found that this was most likely written by a person. |
+| unsure | 0.35 – 0.75 | The system is still thinking about this one. Our checks couldn't tell whether a person or an AI tool wrote it, so we haven't decided either way. If you wrote it yourself, you don't need to do anything. |
+| high-confidence AI | 0.75 – 1.00 | AI detected. Our checks found strong signs that this was written with an AI tool. This is an automated guess and it can be wrong — if you wrote this yourself, you can appeal and a person will review it. |
 
 **Why I worded the "unsure" one this way:**
 <!-- It's the hardest of the three. It has to admit uncertainty without
@@ -121,36 +121,76 @@
      two off the response, so leaving them out costs you next unit's
      diagnostics. -->
 
+Run on port 5001 (`PORT=5001 python app.py`) — on macOS, port 5000 is taken by the AirPlay Receiver.
+
 ```bash
-$ curl -X POST http://127.0.0.1:5000/submit \
+$ curl -X POST http://127.0.0.1:5001/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+  -d '{"text": "Dogs are my favorite animals for many reasons. Firstly, they'\''re a man'\''s best friend, they will follow you anywhere and smile when you smile. Second, they'\''re extremely adorable when they'\''re puppies. Lastly, I love my own dog very much, so he has taught me to love other dogs aswell!", "creator_id": "michelle"}'
 ```
 
 ```json
-
+{
+    "confidence": 0.6412,
+    "content_id": "9cdde5ee66b446f99a8778febd608154",
+    "creator_id": "michelle",
+    "guess": "unsure",
+    "label": "The system is still thinking about this one. Our checks couldn't tell whether a person or an AI tool wrote it, so we haven't decided either way. If you wrote it yourself, you don't need to do anything.",
+    "model_score": 0.7405,
+    "status": "decided",
+    "style_score": 0.4922
+}
 ```
 
 **An appeal**
 
 ```bash
-$ curl -X POST http://127.0.0.1:5000/appeal \
+$ curl -X POST http://127.0.0.1:5001/appeal \
   -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
+  -d '{"content_id": "9cdde5ee66b446f99a8778febd608154", "reasoning": "I wrote this paragraph myself about my own dog. The Firstly/Second/Lastly structure is how I was taught to write in school."}'
 ```
 
 ```json
-
+{
+    "content_id": "9cdde5ee66b446f99a8778febd608154",
+    "message": "valid",
+    "status": "under_review"
+}
 ```
 
 **What the log shows afterwards**
 
+The two log entries for this content_id (from `GET /log`), the original decision followed by the appeal:
+
 ```bash
-$ curl "http://127.0.0.1:5000/log?limit=3"
+$ curl "http://127.0.0.1:5001/log?limit=4"
 ```
 
 ```json
-
+{
+    "count": 2,
+    "entries": [
+        {
+            "combined_score": 0.6412,
+            "content_id": "9cdde5ee66b446f99a8778febd608154",
+            "creator_id": "michelle",
+            "guess": "unsure",
+            "label": "The system is still thinking about this one. Our checks couldn't tell whether a person or an AI tool wrote it, so we haven't decided either way. If you wrote it yourself, you don't need to do anything.",
+            "model_score": 0.7405,
+            "status": "decided",
+            "style_score": 0.4922,
+            "timestamp": "2026-11-05T02:10:32+00:00"
+        },
+        {
+            "content_id": "9cdde5ee66b446f99a8778febd608154",
+            "creator_id": "michelle",
+            "event": "appeal",
+            "reasoning": "I wrote this paragraph myself about my own dog. The Firstly/Second/Lastly structure is how I was taught to write in school.",
+            "status": "under_review",
+            "timestamp": "2026-11-05T02:10:35+00:00"
+        }
+    ]
+}
 ```
 
 ---
