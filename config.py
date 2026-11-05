@@ -65,8 +65,22 @@ MAX_TEXT_CHARS = 10_000
 # down BEFORE you code it, and to put the numbers in your README. Whatever you
 # decide, it goes here.
 
-WEIGHT_MODEL_SIGNAL = 0.5
-WEIGHT_STYLE_SIGNAL = 0.5
+WEIGHT_MODEL_SIGNAL = 0.6
+WEIGHT_STYLE_SIGNAL = 0.4
+
+# When the two signals differ by more than this, they disagree, and the
+# combined score is pulled halfway toward whichever reads more human.
+DISAGREEMENT_GAP = 0.4
+
+# Inside the style signal: how much each measure counts. Must sum to 1.
+#
+# Spread only. On a human paragraph and an AI paragraph about the same topic,
+# type-token ratio and punctuation both pointed the wrong way (the AI text had
+# MORE varied vocabulary and FEWER commas), so they're still measured but no
+# longer counted. Fitted on two paragraphs — unit 8 tests whether it holds.
+WEIGHT_SENTENCE_SPREAD = 1.0
+WEIGHT_TYPE_TOKEN = 0.0
+WEIGHT_PUNCTUATION = 0.0
 
 
 # ─── Thresholds (Milestone 5) ────────────────────────────────────────────────
@@ -83,7 +97,7 @@ WEIGHT_STYLE_SIGNAL = 0.5
 # that decide who pays for it.
 
 HUMAN_THRESHOLD = 0.35
-AI_THRESHOLD = 0.65
+AI_THRESHOLD = 0.75
 
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can
 # only land between its two inputs — so while `style_signal` is still the stub
