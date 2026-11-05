@@ -39,6 +39,14 @@
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
 
+1. **The request arrives** at `POST /submit` (`app.py::submit`) as JSON with `text` and `creator_id`. A missing `creator_id` becomes `"anonymous"`.
+2. **Input checks** turn away anything that can't be scored: not JSON, `text` missing or not a string, empty or whitespace only, or fewer than 5 words gets a **400**; more than 10,000 characters gets a **413**. Every refusal is written to the audit log with a reason (`audit.log_rejection`), so turned-away requests still leave a trace.
+3. **Signal one — the model signal** (`detector.model_signal`). GPT-2, running locally, reads the first 400 tokens and measures how predictable the text is (perplexity). This adds a 0–1 `model_score`, where higher means more likely AI.
+4. **Signal two — the style signal** (`stylometry.style_signal`). This measures the shape of the text without reading it: how much sentence lengths vary. It adds a 0–1 `style_score`, where higher means more likely AI.
+5. **Combining** (`scoring.combine_signals`) turns the two scores into one `confidence` from 0 (human) to 1 (AI): 0.6 × model + 0.4 × style, pulled toward the more-human signal when they disagree.
+6. **Labelling** (`scoring.score_to_label`) turns that number into a `guess` (`human` / `unsure` / `ai`) and the sentence the writer actually reads.
+7. **Logging and the answer.** The decision gets a new `content_id` and is written to `logs/audit.jsonl` with both signal scores, the combined score, the label and `status: "decided"`. The response carries the same fields. If the writer disagrees, they send that `content_id` to `POST /appeal`, which writes the appeal next to the original decision and moves it to `under_review`.
+
 
 
 ---
@@ -53,11 +61,21 @@
 
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** How predictable the text is to a language model (GPT-2's perplexity on the first 400 tokens), squashed onto 0–1 so that low perplexity gives a high AI score.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** A model writes by picking a likely next word again and again, so its own output is easy for a model to predict. People make odder word choices and take abrupt turns.
 
-**What it can't see:**
+**What it can't see:** Who actually wrote it. It rewards common words in ordinary sentences, so plain human writing scores as AI. My own paragraph about my dog scored 0.74 because "Firstly… Second… Lastly" with everyday words is very predictable. Writers in a second language, younger writers and anyone writing plainly get flagged the same way. Going the other way, rare words or deliberate typos raise perplexity and make AI text look human.
+
+### Signal two — the style signal
+
+**What it measures:** How much sentence length varies: the standard deviation of words per sentence divided by the mean. A ratio of 0.2 or below scores 1.0 (AI) and 0.7 or above scores 0.0 (human). A single sentence has no spread, so it scores a neutral 0.5. `stylometry.py` also computes type-token ratio and punctuation density, but they are weighted 0 (see below).
+
+**Why that might differ between human and AI writing:** AI prose tends toward even, steadily built sentences. My AI paragraph ran 13, 17, 23, 29 words. Human writing is lumpier: mine ran 8, 16, 7, 18.
+
+**What it can't see:** The words. It doesn't read at all, so anything that changes the shape without changing the content moves it. Splitting a long AI sentence into short ones, or adding one very short sentence, makes AI text look human. Short texts give it almost nothing to work with: every one-sentence submission gets exactly 0.5.
+
+**Why only one of three measures counts:** I calibrated on a paragraph I wrote and an AI paragraph on the same topic. Vocabulary variety and punctuation both pointed the wrong way. The AI paragraph had *more* varied vocabulary (0.89) and *fewer* commas than mine, which made the style signal call the AI paragraph more human than me (0.49 vs 0.58). With only sentence spread counted, the AI paragraph scores 0.72 and mine 0.49. This is fitted on two paragraphs, so unit 8 will show whether it holds.
 
 ### Signal two — the style signal
 
@@ -72,9 +90,18 @@
 <!-- Write the rule in words, then give the numbers. What happens when the two
      signals disagree? -->
 
-**The rule:**
+**The rule:** A weighted average that leans on the model signal. If the two signals differ by more than 0.4, they are disagreeing, and the result is pulled halfway toward whichever one reads more human. When the methods split, I would rather miss some AI text than accuse a real writer.
 
 **The numbers:**
+
+- `combined = 0.6 × model_score + 0.4 × style_score`
+- if `|model_score − style_score| > 0.4`: `combined = (combined + min(model_score, style_score)) / 2`
+- labels: human below **0.35**, unsure **0.35–0.75**, AI above **0.75**
+- weights inside the style signal: sentence spread **1.0**, type-token ratio **0**, punctuation **0**
+
+All of these are in `config.py`.
+
+**Why these thresholds:** My own paragraph scored 0.641 and the AI paragraph 0.802. The AI line at 0.75 sits between them, closer to the AI score, so my writing lands on "unsure" rather than "AI". With the starter's 0.65 threshold and my first style signal, my paragraph scored 0.675 and would have been accused.
 
 **Where it lives:** `scoring.py::combine_signals`
 
@@ -82,6 +109,8 @@
      somewhere else, say where. -->
 
 **A case where my two signals split, and what my rule does with it:**
+
+"A favorite animal many have are dogs, they are amazing companions and I think most agree." (human, one sentence). The model signal read it as very human (0.131, perplexity 147, because the grammar is unusual). The style signal had nothing to measure in one sentence, so it gave a neutral 0.5. That's a gap of 0.37, just under my 0.4 disagreement line, so the plain weighted average applies: 0.6 × 0.131 + 0.4 × 0.5 = **0.279 → human**. The 0.4 weight on a signal that knew nothing still pulled the score up by 0.12. If the model had been a little more confident, the disagreement rule would have pulled it back down toward 0.13.
 
 
 
@@ -104,6 +133,8 @@
 <!-- It's the hardest of the three. It has to admit uncertainty without
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
+
+My own paragraph lands on this label, so I wrote it for someone like me: a real writer whose work happens to look predictable. It says plainly that the system couldn't decide, not that the writer did anything wrong. It ends by telling them they don't need to do anything, so it doesn't read as a warning. It also doesn't say "try again", which would tell an honest writer they failed and invite people to keep resubmitting until they find a score they like.
 
 
 
@@ -197,17 +228,17 @@ $ curl "http://127.0.0.1:5001/log?limit=4"
 
 ## How I Used AI
 
-**Moment 1**
+**Moment 1 — understanding what I had to decide**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I pasted the milestone instructions into Claude and asked what I needed to write so it could implement the project.
+- *What came back:* A fill-in list of decisions: how to handle bad input, the response fields, how appeals behave, the style weights, the combining rule, the thresholds and the labels. It also flagged that my project folder wasn't connected to my GitHub fork. When I answered, it pushed back on some of my choices: returning 200 for errors, a 400-character limit (too short for a normal paragraph), and a 1–10 confidence scale where low meant AI (the reverse of every other score).
+- *What I changed:* I switched to 400/413 errors, a 10,000-character limit, and a 0–1 confidence where 1 means AI.
 
-**Moment 2**
+**Moment 2 — calibration**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I gave Claude four one-sentence test texts, then a paragraph I wrote myself and an AI-written paragraph on the same topic, and had it score each one on every measure.
+- *What came back:* The one-sentence texts were too short for the style measures to mean anything. My own paragraph scored 0.675, just under the AI line. Vocabulary variety and punctuation were pointing the wrong way, scoring the AI paragraph as more human than mine. Claude offered two options: count only sentence spread, or keep all three and report the finding.
+- *What I changed:* I picked spread only. That moved my paragraph to 0.641 and the AI paragraph to 0.802, and the AI threshold went to 0.75 so it falls between them. I also had Claude expand my one-word labels ("HUMAN", "TRY AGAIN", "ROBOT") into full sentences, starting from my own wording.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
