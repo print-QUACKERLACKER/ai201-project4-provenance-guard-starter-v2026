@@ -42,63 +42,46 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
 
-<!-- Your criterion. It must name a number. -->
+A "paragraph" below means at least 3 sentences and 40 words, sent to `POST /submit` as one request. Every target has to hold in **each** of unit 8's three trials, not on average.
 
+## 1. AI-written text gets caught
 
+Of 10 paragraphs written by an AI chatbot, **at least 8** get the AI label (`guess: "ai"`, combined score above 0.75).
 
-**Why this target:**
-
-
-
----
-
-## 2.
-
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** The AI dog paragraph scored 0.80, comfortably over the line, so most plain AI paragraphs should be caught. I don't ask for 10 of 10 because my thresholds are set to protect real writers first, and some AI text will land on "unsure". That is the trade I chose.
 
 ---
 
-## 3.
+## 2. My stiff, school-style writing isn't accused
 
-<!-- Your criterion. -->
+Of 5 paragraphs I write myself in a structured "Firstly… Second… Lastly" style, **at most 2** get the AI label.
 
-
-
-**Why this target:**
-
-
+**Why this target:** This is the style that nearly got me flagged: my own dog paragraph scored 0.675 before I changed the style signal, and 0.641 after. The model signal reads that structure as predictable, so I expect some of these to land close to the line. Two in five is the most I'd accept before calling the system unfair to students who write the way they were taught.
 
 ---
 
-## 4.
+## 3. Text I can't judge lands on "unsure"
 
-<!-- Your criterion. -->
+Of 5 texts I honestly can't tell are AI or human (for example, AI text I've lightly edited, or my writing with AI-style phrasing), **at least 2** get the unsure label (`guess: "unsure"`, combined score 0.35–0.75).
 
-
-
-**Why this target:**
-
-
+**Why this target:** When I can't tell, the system shouldn't sound sure either. The unsure band is wide (0.35–0.75), so borderline text should often land there. I set this at 2 rather than higher because my one-sentence tests showed the model signal can swing a long way on short, ordinary text.
 
 ---
 
-## 5.
+## 4. My own writing isn't called AI
 
-<!-- Your criterion. -->
+Of 10 paragraphs I wrote myself, in my normal style, **at most 2** get the AI label.
 
+**Why this target:** This is my false-positive criterion. A wrong "AI detected" on someone's real work costs them much more than a missed AI paragraph costs the site, which is why the disagreement rule pulls toward the more-human signal and the AI threshold sits at 0.75 rather than 0.65. My own paragraph scored 0.641, only about 0.11 under the line, so this target is a real test rather than a guaranteed pass.
 
+---
 
-**Why this target:**
+## 5. Professional human writing isn't called AI
 
+Of 10 pieces of published human writing (news articles or essays from before 2022, so no AI tools were involved), **at most 2** get the AI label.
 
+**Why this target:** Professional writing is polished and uses common phrasing, which is exactly what the model signal reads as AI-like. I hold it to the same bar as my own writing, because a professional writer accused of using AI is just as wronged as a student.
 
 ---
 
