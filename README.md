@@ -246,7 +246,7 @@ $ curl "http://127.0.0.1:5001/log?limit=4"
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 5 per minute, 50 per day
 
 **Why those numbers and not others:**
 <!-- Think about two people: a real writer submitting their own work a few
@@ -254,16 +254,31 @@ $ curl "http://127.0.0.1:5001/log?limit=4"
      thresholds. Your numbers have to be liveable for the first and hostile to
      the second. -->
 
+A real writer submits their own piece, maybe fixes a typo and submits again. That's a handful of requests an hour, nowhere near 5 a minute or 50 a day. A script trying to map my thresholds needs hundreds of slightly different versions to find where 0.75 sits. At 50 a day that takes days per creator_id instead of minutes. I picked 5/min over the starter's 10/min because nobody revising their own writing needs more than one submission every 12 seconds. I didn't go down to 3/min because a writer fixing several small mistakes in a row could hit that.
+
 **What a caller counts as:** <!-- per address, or per creator_id? They fail
 differently — one script can look like a thousand callers, and one household
 can look like one. -->
+
+Per `creator_id`, falling back to the caller's address when there isn't one (`app.py::rate_limit_key`). The weakness: a script that makes up a new `creator_id` for every request is never limited, because each one looks like a new writer.
 
 **The run of status codes when I pushed past it:**
 
 <!-- python run_attacks.py --flood 15 -->
 
 ```
+$ PORT=5001 python run_attacks.py --flood 15
 
+200 200 200 200 200 429 429 429 429 429 429 429 429 429 429
+
+10 of 15 were rate limited.
+Wrote results/flood_2026-11-04_2124.md
+```
+
+Each 429 is also written to the audit log:
+
+```json
+{"timestamp": "2026-11-05T02:24:13+00:00", "creator_id": "flood_tester", "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "5 per 1 minute"}
 ```
 
 ---
