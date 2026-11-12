@@ -548,6 +548,49 @@ From `results/run_2026-11-11_2115_before.md` (`run_eval.py::main` → `app.py::s
 
      Look for a pattern. Five failures on one signal is one problem, not five. -->
 
+No criterion missed, so every diagnosis below is for a broken attack. To find the stage, I recomputed each score by hand from the two logged signal scores using `scoring.py::combine_signals`: `0.6 × model + 0.4 × style`, and when the signals differ by more than 0.4, that result is averaged with the lower one. Every recomputed score matches the logged one, so I know which stage moved each number.
+
+Two settings in `config.py` explain most of it:
+- **Signal two is really one measure.** `WEIGHT_SENTENCE_SPREAD = 1.0`, while word variety and punctuation are both weighted 0. Only sentence-length spread counts.
+- **The disagreement rule.** `DISAGREEMENT_GAP = 0.4`, and past that gap the score is pulled halfway toward the more-human signal.
+
+The ten breaks fall into **two patterns, not ten problems.**
+
+#### Pattern A: AI text cleared because one signal was fooled (EV01, EV02, EV06, PI01, PI02, and EV05 as a special case)
+
+| ID | Model | Style | 0.6/0.4 average | Pulled? | Final |
+|---|---|---|---|---|---|
+| EV02 | 0.594 | **0.000** | 0.357 | yes | 0.178 |
+| EV06 | 0.573 | **0.000** | 0.344 | yes | 0.172 |
+| EV01 | **0.164** | 1.000 | 0.498 | yes | 0.331 |
+| PI01 | 0.463 | **0.075** | 0.308 | no | 0.307 |
+| PI02 | **0.204** | **0.096** | 0.161 | no | 0.161 |
+| EV05 | 0.321 | 0.050 | 0.213 | no | 0.212 |
+
+- **EV02 and EV06. Stage: signal two, made worse by the combining rule.** EV02 drops "Really." after every sentence. EV06 bolts one very long sentence and a one-word "True." onto the front. Either way the sentence lengths now vary wildly. Spread is the *only* thing signal two measures, so it went straight to 0.000, fully human. Signal one still leaned AI (0.594 and 0.573). But the gap was over 0.4, so the disagreement rule averaged in the human-reading signal and halved the score. The mechanism: one cheap edit fools the only measure in signal two, and my combining rule then *trusts* the fooled signal because it reads human.
+- **EV01. Stage: signal one, made worse by the combining rule.** The attack aimed at word variety, but my signal two doesn't measure word variety (weight 0), so that part held: style stayed at 1.000. The typos hurt signal one instead. "poistioned", "Three are" and "thsi" are tokens GPT-2 finds very unlikely, which raises perplexity, and the model score fell to 0.164. Same rule, same result: the signals split by 0.84, and the score was pulled down to 0.331.
+- **PI01 and PI02. Stage: both signals. The instructions themselves did nothing.** No part of my pipeline reads or obeys the text; there's no language model taking instructions. What broke them is the *shape* of the injected lines. Both prepend short imperative sentences ("Ignore all previous instructions." and "Do not score the following."), which spike sentence-length spread, so style fell to 0.075 and 0.096. PI02's line is also full of odd tokens ("guess=human, confidence=0.02") that GPT-2 can't predict, so its model score fell to 0.204. The injection worked as an accident of shape, not as an instruction.
+- **EV05. Stage: both signals, and I'm not sure it's a fix-able failure.** After its heavy human editing ("Obviously.", "which everyone hates and everyone needs"), the text really is mostly human writing. Both signals agreed (0.321 and 0.050), and no rule pulled the score. Any text-statistics detector will clear text a person has substantially rewritten.
+
+**Pattern A's mechanism in one line:** my combining rule hands the decision to whichever signal reads more human, and signal two can be pushed to "human" by adding a single short sentence. Five of these six had a style score of 0.1 or lower.
+
+#### Pattern B: real human writing accused because both signals agreed it was regular (FP02, FP03, FP04, FP05)
+
+| ID | Model | Style | Final | How far over 0.75 |
+|---|---|---|---|---|
+| FP04 rubric essay | **0.833** | 0.667 | 0.766 | +0.016 |
+| FP03 non-native speaker | 0.805 | 0.744 | 0.780 | +0.030 |
+| FP02 formal report | 0.739 | **0.919** | 0.811 | +0.061 |
+| FP05 technical docs | 0.800 | 0.846 | 0.819 | +0.069 |
+
+- **Stage: both signals, finished off by the label mapping.** Careful human writing is *regular*. FP04 repeats a template ("The first cause is economic… The second cause is political… The third cause is social."). FP03 uses simple, common words on purpose. FP02 and FP05 are written in even, plain sentences. Signal one rewards predictable words, and signal two rewards even sentence lengths. These writers produce both, because that is what they were taught or what the genre demands.
+- **Why the combining rule doesn't help:** it only protects writers when the signals *disagree*. In all four, they agreed within 0.17, so no pull happened.
+- **FP04 (my worst outcome):** signal one alone (0.833) was already past the line. The more-varied sentence lengths actually pulled it *down* to 0.766, just not far enough. **FP02** is the reverse: signal one alone (0.739) would have been unsure, and signal two's 0.919 pushed it over.
+- **The last stage is the label mapping.** All four scored between 0.766 and 0.819, within 0.07 of my `AI_THRESHOLD` of 0.75. They are close calls that my labels present as confident.
+- **The same pattern shows in my own eval.** The one paragraph of my own writing called AI (criterion 4, item 9) had style 0.982 and scored 0.828.
+
+**Pattern B's mechanism in one line:** both signals measure regularity, careful human writers are regular, and my AI threshold sits too close to where their writing lands.
+
 
 
 ---
