@@ -240,6 +240,18 @@ $ curl "http://127.0.0.1:5001/log?limit=4"
 - *What came back:* The one-sentence texts were too short for the style measures to mean anything. My own paragraph scored 0.675, just under the AI line. Vocabulary variety and punctuation were pointing the wrong way, scoring the AI paragraph as more human than mine. Claude offered two options: count only sentence spread, or keep all three and report the finding.
 - *What I changed:* I picked spread only. That moved my paragraph to 0.641 and the AI paragraph to 0.802, and the AI threshold went to 0.75 so it falls between them. I also had Claude expand my one-word labels ("HUMAN", "TRY AGAIN", "ROBOT") into full sentences, starting from my own wording.
 
+**Moment 3: running the test (unit 8)**
+
+- *What I asked for:* I pasted the unit 8 instructions into Claude and asked what it needed from me, then had it run the attack set, the eval and the flood test, and fill in the tables.
+- *What came back:* It ran everything and marked each attack held or broke. It asked me one question it couldn't decide alone: does "unsure" count as held? I said yes. When I sent casual paragraphs for my "stiff writing" criterion, it pointed out they weren't in the Firstly/Second/Lastly style and were under 40 words. It refused to write extra sentences "in my style", because that would put AI text into my false-positive test. It pulled the 10 published paragraphs from Project Gutenberg and 2019 Wayback Machine snapshots of US government pages, not from memory, so each has a real source. It also warned that the old prose might be easier to call human, which turned out to be true.
+- *What I changed / decided:* I used my old social-media essay for criterion 2, my speaking-up narrative for criterion 4, and wrote three sentences myself to extend my running paragraphs. For criterion 3, Claude drafted five AI paragraphs and I edited four of them myself; the fifth is my own meditation piece. I picked FP04 as my worst outcome.
+
+**Moment 4: diagnosis and the fix**
+
+- *What I asked for:* I asked Claude to draft the diagnoses and make the improvement.
+- *What came back:* It recomputed every broken attack's score by hand from the two signal scores to find which stage moved it. It found two patterns: one signal fooled and then trusted by my disagreement rule, and both signals reading careful human writing as regular. It simulated two candidate fixes on the logged scores before changing anything, and predicted that raising the threshold would fix all four false positives but cost criterion 1.
+- *What I changed / decided:* I chose the threshold fix (0.75 → 0.82) because my criteria put wrong accusations first. The after runs matched the prediction exactly.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
@@ -715,13 +727,24 @@ One thing it did *not* fix: criterion 4's paragraph 9 of my own writing is still
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
 
+**EV02, EV06 and PI01: one short sentence fools signal two.** All three add very short sentences ("Really.", "True.", "Ignore all previous instructions.") so the sentence-length spread jumps, and spread is the *only* thing my style signal measures. **What I'd do:** make spread ignore sentences under about 4 words, or use a measure that one outlier can't swing (such as the median gap between sentence lengths instead of the standard deviation). That takes the cheapest evasion off the table. **Why I stopped:** this unit allows one change, and I spent it on false accusations because they cost more.
 
+**EV01: typos fool signal one, and the disagreement rule trusts it.** **What I'd do:** change the disagreement rule so it doesn't automatically side with the more-human signal. For example, when the signals split by more than 0.4, return "unsure" instead of pulling toward human. Signals that disagree really is uncertainty. On my logged scores, just removing the pull would also fix EV02. **Why I stopped:** same one-change rule. It also needs re-checking against my own writing: several of my paragraphs split too, and I don't want to push them toward AI.
+
+**PI02: injected odd tokens lower the model score.** Nothing obeys the instruction, but "guess=human, confidence=0.02" is text GPT-2 can't predict. **What I'd do:** nothing aimed at prompt injection itself, since there's no instruction-follower to defend. The two fixes above (robust spread, no pull toward human) would raise this score too. A rule that strips "SYSTEM:"-style lines would be a patch for this one attack, and an attacker would just reword it.
+
+**EV05: heavy human editing.** **What I'd do:** probably nothing. After that much rewriting, the text is mostly human writing. A text-statistics detector can't tell "a person rewrote AI text" from "a person wrote this". Catching it would take something other than the text, like drafting history.
+
+**Criterion 1 (MISSED, 7/10) and the overlap between 0.73 and 0.82.** This is the real limit. With these two signals, AI paragraphs and careful human writing land in the same score range, so any threshold mislabels one group or the other. **What I'd do:** improve the signals, not the threshold. Turning on the word-variety and punctuation measures that I turned off in unit 7 (they pointed the wrong way on my calibration texts), recalibrated on more than two paragraphs, might separate them. **Why I stopped:** that's a signal redesign, much bigger than one change, and I'd need a larger calibration set to trust it.
+
+**Criterion 4 (MET, but weakly).** 8 of my 10 paragraphs get "couldn't tell", and only 1 gets "human". Paragraph 9 is still called AI at 0.828, mainly from style (0.982), because that passage has evenly sized sentences. The robust-spread fix above is also what I'd try here.
 
 **The trade I'd make if this ran for real:**
 
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
 
+I'd keep the threshold at 0.82 and accept that more AI text gets through as "unsure". A writer wrongly labelled "AI detected" can lose a grade, a job or their reputation, while a missed AI paragraph only costs the site some trust in its labels. The people who pay for my choice are honest writers competing with undetected AI submissions, and readers who trust a label that now says "couldn't tell" more often. I think that's the fairer side to put the cost on, because "unsure" never accuses anyone.
 
 
 <!-- ═════════════════════════════════════════════════════════════════════
