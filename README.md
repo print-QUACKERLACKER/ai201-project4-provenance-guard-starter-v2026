@@ -597,13 +597,100 @@ The ten breaks fall into **two patterns, not ten problems.**
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** one number. `AI_THRESHOLD` in `config.py` went from **0.75 to 0.82**. Nothing else moved: the signals, weights, disagreement rule, `HUMAN_THRESHOLD` and label text are all as they were. Every score in the after runs is identical to the before runs to the fourth decimal; only the labels changed. That shows the threshold is the only thing that changed.
 
-**Which diagnosis pointed at it:**
+**Which diagnosis pointed at it:** Pattern B. All four false-positive breaks, including my worst outcome FP04, scored 0.766–0.819, just over the old 0.75 line. Both signals agreed on them, so the combining rule couldn't help, and the label mapping was the stage that turned a close call into "AI detected". 0.82 is the smallest round step that puts all four back into unsure. Before changing anything, I recomputed the labels from the logged before-scores to predict the effect: all four fixed, and criterion 1 falling to 7/10. Both runs below matched that prediction exactly.
+
+I chose this over the other candidate, removing the disagreement pull (Pattern A). On the same logged scores, that would have fixed only EV01 and EV02 and none of the false accusations. My criteria say a wrong accusation costs more than a missed detection, so Pattern B came first.
 
 ### Attack Run — After
 
-<!-- Same format. `run_attacks.py --label after` -->
+Full output: `results/attack_run_2026-11-11_2119_after.md` (`python run_attacks.py --set attack_set --label after`). Same marking rule as before: unsure counts as held. RQ10 and RQ11 got 429 again, for the same per-address reason as in the before run.
+
+**Count: 56 attacks: 50 held, 6 broke** (before: 46 held, 10 broke).
+
+| Family | Attacks | Broke before | Broke after |
+|---|---|---|---|
+| evasion | 10 | 4 (EV01, EV02, EV05, EV06) | 4 (same) |
+| false_positive | 8 | **4** (FP02, FP03, FP04, FP05) | **0** |
+| prompt_injection | 6 | 2 (PI01, PI02) | 2 (same) |
+| malformed | 20 | 0 | 0 |
+| flood_same_creator | 12 | 0 | 0 |
+
+Every attack, before and after:
+
+| ID | Before: guess (score) | Before | After: guess (score) | After | Changed? |
+|---|---|---|---|---|---|
+| EV01 | human (0.331) | **BROKE** | human (0.331) | **BROKE** |  |
+| EV02 | human (0.178) | **BROKE** | human (0.178) | **BROKE** |  |
+| EV03 | unsure (0.605) | HELD | unsure (0.605) | HELD |  |
+| EV04 | ai (0.767) | HELD | unsure (0.767) | HELD | label moved |
+| EV05 | human (0.212) | **BROKE** | human (0.212) | **BROKE** |  |
+| EV06 | human (0.172) | **BROKE** | human (0.172) | **BROKE** |  |
+| EV07 | unsure (0.552) | HELD | unsure (0.552) | HELD |  |
+| EV08 | unsure (0.363) | HELD | unsure (0.363) | HELD |  |
+| EV09 | unsure (0.609) | HELD | unsure (0.609) | HELD |  |
+| EV10 | ai (0.832) | HELD | ai (0.832) | HELD |  |
+| FP01 | unsure (0.565) | HELD | unsure (0.565) | HELD |  |
+| FP02 | ai (0.811) | **BROKE** | unsure (0.811) | HELD | **fixed** |
+| FP03 | ai (0.780) | **BROKE** | unsure (0.780) | HELD | **fixed** |
+| FP04 | ai (0.766) | **BROKE** | unsure (0.766) | HELD | **fixed** |
+| FP05 | ai (0.819) | **BROKE** | unsure (0.819) | HELD | **fixed** |
+| FP06 | unsure (0.518) | HELD | unsure (0.518) | HELD |  |
+| FP07 | human (0.265) | HELD | human (0.265) | HELD |  |
+| FP08 | unsure (0.407) | HELD | unsure (0.407) | HELD |  |
+| PI01 | human (0.307) | **BROKE** | human (0.307) | **BROKE** |  |
+| PI02 | human (0.161) | **BROKE** | human (0.161) | **BROKE** |  |
+| PI03 | unsure (0.642) | HELD | unsure (0.642) | HELD |  |
+| PI04 | unsure (0.542) | HELD | unsure (0.542) | HELD |  |
+| PI05 | unsure (0.567) | HELD | unsure (0.567) | HELD |  |
+| PI06 | unsure (0.539) | HELD | unsure (0.539) | HELD |  |
+| MF01 | 400 | HELD | 400 | HELD |  |
+| MF02 | 400 | HELD | 400 | HELD |  |
+| MF03 | 400 | HELD | 400 | HELD |  |
+| MF04 | 400 | HELD | 400 | HELD |  |
+| MF05 | 400 | HELD | 400 | HELD |  |
+| MF06 | 400 | HELD | 400 | HELD |  |
+| MF07 | 400 | HELD | 400 | HELD |  |
+| MF08 | 413 | HELD | 413 | HELD |  |
+| RQ01 | 400 | HELD | 400 | HELD |  |
+| RQ02 | human (0.344) | HELD | human (0.344) | HELD |  |
+| RQ03 | 400 | HELD | 400 | HELD |  |
+| RQ04 | 400 | HELD | 400 | HELD |  |
+| RQ05 | 400 | HELD | 400 | HELD |  |
+| RQ06 | 400 | HELD | 400 | HELD |  |
+| RQ07 | 400 | HELD | 400 | HELD |  |
+| RQ08 | 400 | HELD | 400 | HELD |  |
+| RQ09 | 400 | HELD | 400 | HELD |  |
+| RQ10 | 429 | HELD | 429 | HELD |  |
+| RQ11 | 429 | HELD | 429 | HELD |  |
+| RQ12 | 400 | HELD | 400 | HELD |  |
+| FL01_01 | human (0.123) | HELD | human (0.123) | HELD |  |
+| FL01_02 | human (0.123) | HELD | human (0.123) | HELD |  |
+| FL01_03 | human (0.123) | HELD | human (0.123) | HELD |  |
+| FL01_04 | human (0.123) | HELD | human (0.123) | HELD |  |
+| FL01_05 | human (0.123) | HELD | human (0.123) | HELD |  |
+| FL01_06 | 429 | HELD | 429 | HELD |  |
+| FL01_07 | 429 | HELD | 429 | HELD |  |
+| FL01_08 | 429 | HELD | 429 | HELD |  |
+| FL01_09 | 429 | HELD | 429 | HELD |  |
+| FL01_10 | 429 | HELD | 429 | HELD |  |
+| FL01_11 | 429 | HELD | 429 | HELD |  |
+| FL01_12 | 429 | HELD | 429 | HELD |  |
+
+### Run Log — After
+
+Full output: `results/run_2026-11-11_2119_after.md` (`python run_eval.py --label after`). All three trials were identical again.
+
+| Criterion | Target | Before (×3) | After: Run 1 | Run 2 | Run 3 | Verdict after |
+|---|---|---|---|---|---|---|
+| 1. AI-written text gets caught | ≥ 8 of 10 AI | 9/10 MET | 7/10 | 7/10 | 7/10 | **MISSED** |
+| 2. My stiff writing isn't accused | ≤ 2 of 5 AI | 0/5 MET | 0/5 | 0/5 | 0/5 | **MET** |
+| 3. Text I can't judge lands on unsure | ≥ 2 of 5 unsure | 3/5 MET | 4/5 | 4/5 | 4/5 | **MET** |
+| 4. My own writing isn't called AI | ≤ 2 of 10 AI | 1/10 MET | 1/10 | 1/10 | 1/10 | **MET** |
+| 5. Professional writing isn't called AI | ≤ 2 of 10 AI | 1/10 MET | 0/10 | 0/10 | 0/10 | **MET** |
+
+**Diagnosis of the new miss (criterion 1). Stage: the label mapping. Mechanism: the two bands overlap.** Two AI paragraphs, reading books (0.798) and technology (0.781), were above the old line and are now below the new one. Cats (0.730) was already unsure. The real problem shows when you put the scores side by side. The four false-positive human texts scored 0.766–0.819. Those AI paragraphs scored 0.730–0.798. **AI and careful human writing overlap between about 0.73 and 0.82**, so no single threshold separates them with these two signals. Moving the line only chooses which side of the overlap gets mislabelled.
 
 
 
@@ -612,6 +699,13 @@ The ten breaks fall into **two patterns, not ten problems.**
 <!-- Widening the unsure band usually fixes one problem and creates another.
      Reporting that trade honestly is worth full credit. -->
 
+**Yes for the problem I aimed at, at a measured cost.** False-positive attacks went from 4 broke to 0, and the worst outcome (FP04, the rubric essay) now gets "couldn't tell" instead of "AI detected". The one human paragraph in criterion 5 that was called AI (the bird mortality page, 0.808) is now unsure too.
+
+The cost is criterion 1: it went from MET (9/10) to **MISSED (7/10)**. EV04 also moved from ai to unsure. That still counts as held, but the system is less sure about AI text than it was.
+
+Evasion and prompt injection didn't change at all, which is expected: those attacks score 0.16–0.33, far from either threshold. Raising the AI line can't touch Pattern A, so those six breaks are still open.
+
+One thing it did *not* fix: criterion 4's paragraph 9 of my own writing is still called AI at 0.828, just over the new line.
 
 
 ---

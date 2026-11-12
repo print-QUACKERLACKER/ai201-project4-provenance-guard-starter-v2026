@@ -97,7 +97,9 @@ WEIGHT_PUNCTUATION = 0.0
 # that decide who pays for it.
 
 HUMAN_THRESHOLD = 0.35
-AI_THRESHOLD = 0.75
+# Unit 8 improvement: raised from 0.75. All four false-positive attacks
+# (careful human writing) scored 0.766-0.819, just over the old line.
+AI_THRESHOLD = 0.82
 
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can
 # only land between its two inputs — so while `style_signal` is still the stub
