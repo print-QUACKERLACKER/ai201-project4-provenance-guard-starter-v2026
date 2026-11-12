@@ -389,18 +389,148 @@ whose work got caught by it:
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. AI-written text gets caught | ≥ 8 of 10 labelled AI | 9/10 | 9/10 | 9/10 | **MET** |
+| 2. My stiff, school-style writing isn't accused | ≤ 2 of 5 labelled AI | 0/5 | 0/5 | 0/5 | **MET** |
+| 3. Text I can't judge lands on "unsure" | ≥ 2 of 5 labelled unsure | 3/5 | 3/5 | 3/5 | **MET** |
+| 4. My own writing isn't called AI | ≤ 2 of 10 labelled AI | 1/10 | 1/10 | 1/10 | **MET** |
+| 5. Professional human writing isn't called AI | ≤ 2 of 10 labelled AI | 1/10 | 1/10 | 1/10 | **MET** |
+
+Full output: `results/run_2026-11-11_2115_before.md`, produced by `run_eval.py::main` against `app.py::submit` (scoring in `scoring.py::combine_signals`). Scenarios are in `scenarios.py`. Command: `python run_eval.py --label before`. **All three trials were identical**, down to the fourth decimal of every score. Neither signal is random, so that's expected, and it means each result holds rather than turning up once.
+
+**How I decided each verdict:**
+
+1. **MET.** 9 of 10 AI paragraphs got `ai` in every trial. The one that didn't (cats, 0.730) landed on unsure, 0.02 under the 0.75 line. It wasn't labelled human.
+2. **MET.** None of the 5 paragraphs from my old school essay got `ai`. Closest was the intro at 0.716, 0.034 under the line. The two longest body paragraphs (422 and 510 words) scored 0.370 and 0.227, because the style signal read them as very human (0.222 and 0.000).
+3. **MET.** 3 of 5 landed on unsure: my meditation piece (0.704) and two of the lightly edited AI drafts (0.631, 0.628). The other two lightly edited drafts, friendship (0.874) and music (0.777), still got `ai`. My edits were too light to hide them, which is the system working as intended.
+4. **MET.** 1 of 10 got `ai`: passage 3 of my speaking-up narrative, 0.828, with style 0.982. But only 1 of 10 got `human`. The other 8 landed on unsure, between 0.427 and 0.652.
+5. **MET.** 1 of 10 got `ai`: the 2019 US Fish & Wildlife Service paragraph on bird mortality, 0.808. The five modern government paragraphs scored 0.435–0.808. Four of the five older pieces (1790s–1911) scored lower, 0.116–0.513, and the two that got `human` are both from that group. Old-fashioned prose made this criterion easier than modern professional writing would.
+
+**Every criterion met, so were my targets too low?** Partly, yes. The attack set's `false_positive` family broke **4 of 8** (FP02–FP05), but my own false-positive criteria (2, 4, 5) only allowed 1 or 2 accusations in 10. My test inputs were easier than the attack set's in two ways:
+- My stiff essay paragraphs were long (115–510 words). FP04, the short rubric essay, got `ai` at 0.766.
+- Criterion 5 was half old prose, which reads as human.
+
+The criterion I'd tighten is **4**. "At most 2 of 10 labelled AI" passes even when 8 of my 10 real paragraphs get "we couldn't tell", which is what happened. A writer whose own work is mostly called "unsure" isn't well served. A stricter version would be "at least 5 of 10 of my own paragraphs labelled human". Against that, I'd have scored 1/10, a clear miss.
 
 **Real output from one trial**, pasted as text, naming the file and function
 that produced it:
 
-```json
+From `results/run_2026-11-11_2115_before.md` (`run_eval.py::main` → `app.py::submit`). Trials 2 and 3 are byte-for-byte the same.
 
+**Criterion 1 (AI paragraphs)**, trial 1, items 1 and 2 of 10:
+
+```json
+{
+  "status": 200,
+  "guess": "unsure",
+  "confidence": 0.7304,
+  "model_score": 0.7795,
+  "style_score": 0.6568,
+  "label": "The system is still thinking about this one. Our checks couldn't tell whether a person or an AI tool wrote it, so we haven't decided either way. If you wrote it yourself, you don't need to do anything.",
+  "sent": "Cats make wonderful pets for people with busy lifestyles. They are ind"
+}
+{
+  "status": 200,
+  "guess": "ai",
+  "confidence": 0.7978,
+  "model_score": 0.8184,
+  "style_score": 0.7668,
+  "label": "AI detected. Our checks found strong signs that this was written with an AI tool. This is an automated guess and it can be wrong — if you wrote this yourself, you can appeal and a person will review it.",
+  "sent": "Reading books offers numerous benefits for both the mind and overall w"
+}
 ```
+
+**Criterion 2 (my stiff writing)**, trial 1, items 1 and 3 of 5:
+
+```json
+{
+  "status": 200,
+  "guess": "unsure",
+  "confidence": 0.7159,
+  "model_score": 0.7299,
+  "style_score": 0.6948,
+  "label": "The system is still thinking about this one. Our checks couldn't tell whether a person or an AI tool wrote it, so we haven't decided either way. If you wrote it yourself, you don't need to do anything.",
+  "sent": "Social media, it’s the platform media-wise that you’re mostly on every"
+}
+{
+  "status": 200,
+  "guess": "human",
+  "confidence": 0.2265,
+  "model_score": 0.7551,
+  "style_score": 0.0,
+  "label": "Written by a human. Our checks found that this was most likely written by a person.",
+  "sent": "Secondly, the negative effects of using social media. An obviously hug"
+}
+```
+
+**Criterion 3 (can't tell)**, trial 1, items 1 and 2 of 5:
+
+```json
+{
+  "status": 200,
+  "guess": "unsure",
+  "confidence": 0.7037,
+  "model_score": 0.6645,
+  "style_score": 0.7624,
+  "label": "The system is still thinking about this one. Our checks couldn't tell whether a person or an AI tool wrote it, so we haven't decided either way. If you wrote it yourself, you don't need to do anything.",
+  "sent": "It’s something you’ve definitely seen on television once or twice– an "
+}
+{
+  "status": 200,
+  "guess": "ai",
+  "confidence": 0.8736,
+  "model_score": 0.7894,
+  "style_score": 1.0,
+  "label": "AI detected. Our checks found strong signs that this was written with an AI tool. This is an automated guess and it can be wrong — if you wrote this yourself, you can appeal and a person will review it.",
+  "sent": "Strong friendships are an important part of a happy and healthy life. "
+}
+```
+
+**Criterion 4 (my own writing)**, trial 1, items 9 and 5 of 10:
+
+```json
+{
+  "status": 200,
+  "guess": "ai",
+  "confidence": 0.8281,
+  "model_score": 0.7253,
+  "style_score": 0.9823,
+  "label": "AI detected. Our checks found strong signs that this was written with an AI tool. This is an automated guess and it can be wrong — if you wrote this yourself, you can appeal and a person will review it.",
+  "sent": "When the words came out of my mouth, I realized I had spoken perfectly"
+}
+{
+  "status": 200,
+  "guess": "human",
+  "confidence": 0.1439,
+  "model_score": 0.2399,
+  "style_score": 0.0,
+  "label": "Written by a human. Our checks found that this was most likely written by a person.",
+  "sent": "one form of exercise i hate is running.. i dont understand how some en"
+}
+```
+
+**Criterion 5 (published human writing)**, trial 1, items 5 and 9 of 10:
+
+```json
+{
+  "status": 200,
+  "guess": "ai",
+  "confidence": 0.8077,
+  "model_score": 0.7577,
+  "style_score": 0.8827,
+  "label": "AI detected. Our checks found strong signs that this was written with an AI tool. This is an automated guess and it can be wrong — if you wrote this yourself, you can appeal and a person will review it.",
+  "sent": "Both natural and human-caused sources of bird mortality contribute cum"
+}
+{
+  "status": 200,
+  "guess": "human",
+  "confidence": 0.1155,
+  "model_score": 0.1925,
+  "style_score": 0.0,
+  "label": "Written by a human. Our checks found that this was most likely written by a person.",
+  "sent": "We were pelted about noon by a short, heavy rainstorm, sublime thunder"
+}
+```
+
 
 **Diagnoses**
 
